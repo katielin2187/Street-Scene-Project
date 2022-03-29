@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>CS 543 Project 3</title>
+
+    <!--Default Vertex Shader-------------------------------------------------->
+    <script id="vertex-shader" type="x-shader/x-vertex">
+
+    precision mediump float;
+    attribute vec3 vPosition;
+    attribute vec3 vNormal;
+    attribute vec3 vColorDiffuse;
+    attribute vec3 vColorSpecular;
+    attribute vec2 vTexture;
+
+    varying vec3 L, N, V, R;
+    varying vec3 passedMaterialDiffuse;
+    varying vec3 passedMaterialSpecular;
+    varying vec2 passedTextureCoordinates;
+
+    uniform vec3 lightPosition;
+
+    uniform mat4 projectionMatrix;
+    uniform mat4 cameraMatrix;
+    uniform mat4 modelViewMatrix;
+    uniform float toggleRefractionOn;
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    vec3 ambientColor = vec3(0.3, 0.2, 0.1);
+
+    void main()
+    {
+
+        gl_Position = projectionMatrix * cameraMatrix * modelViewMatrix * vec4(vPosition, 1.0);
+
+        //doing the translations onto the normals
+        //vec4 normalTranslated = modelViewMatrix * vec4(vNormal, 1.0);
+        //N = normalTranslated.xyz/ normalTranslated.w;
+
+        vec4 normalTranslated = modelViewMatrix * vec4(vNormal, 1.0);    // This will rotate and translate our normals, however we only want to rotate
+        vec4 mvmOffset = modelViewMatrix * vec4(0, 0, 0, 1);            // This will return us a Vec4 representing the translation of this scene Obejct in world
+        N = ((normalTranslated.xyz / normalTranslated.w) - ((mvmOffset.xyz)/mvmOffset.w));  // This will offset our normals by the inverse translation to put them back at 0,0. Now it is if we simply rotated by the MVM instead of Rotate and Translate
+
+        //pos is vertex position in eye coordinates
+        vec3 pos = (modelViewMatrix * vec4(vPosition, 1.0)).xyz;       //vec3 pos = (modelViewMatrix * vPosition).xyz;
+
+        //R = refract(pos, N);
+
+        R = reflect(pos, N);
+
+        if(toggleRefractionOn > 0.0){
+            vec3 R = refract(pos, N, 0.95);
+        }
+
+        L = normalize(lightPosition.xyz - pos);                          //Local Lighting,
+
+        vec4 camOffset = cameraMatrix * vec4(0, 0, 0, 1);
+        V = normalize(camOffset.xyz - pos);
+
+        passedMaterialDiffuse = vColorDiffuse;
+        passedMaterialSpecular = vColorSpecular;
+        passedTextureCoordinates = vTexture;
+
+
+    }
+    </script>
+
+    <!-- Default Fragment Shader-------------------------------------------------->
+    <script id="fragment-shader" type="x-shader/x-fragment">
+
+    precision mediump float;
+    varying vec3 L, N, V, R;
+
+    varying vec3 passedMaterialDiffuse;
+    varying vec3 passedMaterialSpecular;
+    varying vec2 passedTextureCoordinates;
+
+    uniform int toggleLightOn;          //can use uniform variables to change computation to modify values instead of using "if"
+    uniform sampler2D diffuseTexture;   //store texture data into
+    uniform int toggleShadowsOn;
+    uniform float toggleRefractionOn;
+    uniform float toggleReflectionOn;
+
+    //uniform vec4 fColor; --> originally was going to create a shadow with this
+    uniform samplerCube texMap;     //store 3d texture data into
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    void main()
+    {
+
+        //gl_FragColor = vec4(N, 1.0);  //fColor;
+
+        vec3 R = reflect(L, N);                         //reflect L vector by the N vector for the reflection vector
+
+
+        vec3 H = normalize(L + V);                      //halfway vector between L and V
+        float inLine = max(dot(N, L), 0.00001) * float(toggleLightOn);         //how in light a face is to see how parallel they are
+
+        float specularReflection = max(dot(R, V * -1.0), 0.00001) * float(toggleLightOn);
+
+        //float ambientConstant = toggleLightOn > 0 ? 0.3 : 1.0 ;
+        float ambientConstant = 0.3;
+
+        vec3 diffuseColor_Base = passedMaterialDiffuse;
+
+        vec3 shadowDiffuse = toggleShadowsOn > 0 ? vec3(0.1, 0.1, 0.2) : diffuseColor_Base;        ////if there will be a shadow for the object
+
+        if((passedTextureCoordinates.x + passedTextureCoordinates.y) > 0.0){       //if there's any data, use the texture call
+            diffuseColor_Base = texture2D(diffuseTexture, (passedTextureCoordinates * vec2(1.0, -1.0) )).rgb;
+        }
+
+        //if there will be a shadow
+
+        if(float(toggleShadowsOn) > 0.0){       //if there will be a shadow for the objects
+            gl_FragColor = vec4(shadowDiffuse, 1.0);
+            return;
+        }
+
+        vec3 diffuseColor = (inLine + ambientConstant) * diffuseColor_Base;
+        vec3 specularColor = specularReflection * passedMaterialSpecular;
+
+        //cube map  --  vec4 texColor = textureCube(texMap, R); don't have R value so use N
+        vec4 texColor = textureCube(texMap, R);
+
+
+        //reflection
+        float reflectionValue = toggleReflectionOn;
+        gl_FragColor = mix ( vec4(diffuseColor + specularColor, 1.0), vec4(texColor.xyz, 1.0) , toggleReflectionOn);
+
+
+        //refraction
+        float refractionValue = toggleRefractionOn;
+        if(toggleRefractionOn > 0.0){
+            R = refract(L, N, (1.0 / 100.3));        //refractive index of air (1.0) / refractive index of material you want
+            texColor = textureCube(texMap, R);
+            gl_FragColor = mix ( vec4(diffuseColor + specularColor, 1.0), vec4(texColor.xyz, 1.0) , refractionValue);
+        }
+
+
+        //reflection
+        //gl_FragColor = vec4(diffuseColor + specularColor, 1.0);
+        //gl_FragColor = mix ( vec4(diffuseColor + specularColor, 1.0), vec4(texColor.xyz, 1.0) , 0.0);
+
+         //make the 0.8, be a uniform per object, and
+         //another uniform that is on or not, multiply the object uniform by the 0or 1 object
+
+    }
+    </script>
+
+    <!--Skybox Vertex Shader-------------------------------------------------->
+    <script id="vertex-shader-skybox" type="x-shader/x-vertex">
+
+    precision mediump float;
+    attribute vec3 vPosition;
+
+    varying vec3 N;
+
+    uniform mat4 projectionMatrix;
+    uniform mat4 cameraMatrix;
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    void main()
+    {
+
+        N = normalize(vPosition.xyz);       //need correct normals for it to run smoothly
+        gl_Position = projectionMatrix * cameraMatrix * vec4(vPosition * 16.0, 1.0);
+
+    }
+    </script>
+
+    <!--Skybox Shader-------------------------------------------------->
+    <script id="fragment-shader-skybox" type="x-shader/x-fragment">
+
+    precision mediump float;
+    uniform samplerCube texMap;
+
+    varying vec3 N;
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    void main()
+    {
+
+        //cube map  --  vec4 texColor = textureCube(texMap, R); don't have R value so use N
+        vec4 texColor = textureCube(texMap, N * vec3(1.0, 1.0, 1.0)); //textureCube(texMap, R);
+
+        gl_FragColor = texColor;  //vec4(N, 1.0);      //fColor; vec4(1.0, 0.0, 0.0, 1.0);  //fColor;
+
+    }
+    </script>
+
+    <!--Included Scripts--------------------------------------------------------------->
+    <script type="text/javascript" src="lib/webgl-utils.js"></script>
+    <script type="text/javascript" src="lib/initShaders.js"></script>
+    <script type="text/javascript" src="lib/MV.js"></script>
+    <script type="text/javascript" src="main.js"></script>
+    <script type="text/javascript" src="generalObjectMTL.js"></script>
+    <script type="text/javascript" src="generalObject.js"></script>
+    <script type="text/javascript" src="sceneObject.js"></script>
+    <script type="text/javascript" src="sceneObjectMTL.js"></script>
+    <script type="text/javascript" src="parseObjects.js"></script>
+    <script type="text/javascript" src="mtl.js"></script>
+    <script type="text/javascript" src="parseMTLs.js"></script>
+    <script type="text/javascript" src="utility.js"></script>
+
+</head>
+<!--body--------------------------------------------------------------------->
+<body>
+<!--title------------------------------------------------------------------>
+<h1>CS 543 Project 3</h1>
+<canvas id="gl-canvas" width="900" height="600">
+    Oops ... your browser doesn't support the HTML5 canvas element
+</canvas>
+
+</body>
+</html>

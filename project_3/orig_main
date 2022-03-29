@@ -1,0 +1,1118 @@
+"use strict";
+
+let canvas;
+let gl;
+let m;
+let program;
+
+let flattenedArray;
+let flattenedNormalArray;
+var colorsArray = [];
+var texCoordsArray = [];
+
+let k = 0;
+let aspect;
+let near = 0.1;
+let far = 100;
+let left = -2.0;
+let right = 2.0;
+let ytop = 2.0;
+let bottom = -2.0;
+
+let projectionMatrix, projectionMatrixLoc;
+let modelViewMatrix, modelViewMatrixLoc;
+let cameraMatrix, cameraMatrixLoc;
+
+let fColor;
+
+let eye, at, up;
+let light;
+
+let red;
+let black;
+let yellow;
+let blue;
+let green;
+
+//multiple form objects
+let scene_obj;
+let obj_array = [];
+let mtl_array = [];
+let car_mtl;
+let car_obj;
+let lamp_mtl;
+let lamp_obj;
+let stop_png;
+let stop_alt_png;
+let stopsign_mtl;
+let stopsign_obj;
+let street_mtl;
+let street_obj;
+let street_alt_mtl;
+let street_alt_obj;
+let exObj_obj;
+let exObj_mtl;
+
+//multiple form objects URLs
+let ex_obj_URL = "https://files.slack.com/files-pri/T02TK1RK9TQ-F02V2SD0DEU/sphere_smooth.obj";
+let ex_obj_mtl_URL = "https://cs4731c22.slack.com/files/U02TRU16C9H/F02U6EA5DQW/sphere_smooth.mt";
+let car_mtl_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/car.mtl";
+let car_obj_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/car.obj";
+let lamp_mtl_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/lamp.mtl";
+let lamp_obj_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/lamp.obj";
+let stop_png_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/stop.png";
+let stop_alt_png_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/stop_alt.png";
+let stopsign_mtl_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/stopsign.mtl";
+let stopsign_obj_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/stopsign.obj";
+let street_mtl_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/street.mtl";
+let street_obj_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/street.obj";
+let street_alt_mtl_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/street_alt.mtl";
+let street_alt_obj_URL = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/street_alt.obj";
+
+//let firstDraw = true;
+
+/**
+ * Lighting Data
+ */
+let diffuseProduct;
+let specularProduct;
+let ambientProduct;
+let lightPosition = vec4(1.0, 2.0, 2.0, 1.0 );
+let lightAmbient = vec4(0.5, 0.5, 0.5, 1.0 );
+let lightDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
+let lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+
+
+let materialAmbient; // = vec4( 1.0, 0.0, 1.0, 1.0 );
+let materialDiffuse; // = vec4( 1.0, 0.8, 0.0, 1.0 );
+let materialSpecular; // = vec4( 1.0, 1.0, 1.0, 1.0 );
+let materialShininess = 20.0;
+
+let redU = new Uint8Array([255, 0, 0, 255]);
+let greenU = new Uint8Array([0, 255, 0, 255]);
+let blueU = new Uint8Array([0, 0, 255, 255]);
+let cyanU = new Uint8Array([0, 255, 255, 255]);
+let magentaU = new Uint8Array([255, 0, 255, 255]);
+let yellowU = new Uint8Array([255, 255, 0, 255]);
+let greyU = vec4(0.5, 0.5, 0.5, 1.0);
+
+let cubeMap;
+
+let texture;
+
+let minT = 0.0;
+let maxT = 1.0;
+
+let texCoord = [
+    vec2(minT, minT),
+    vec2(minT, maxT),
+    vec2(maxT, maxT),
+    vec2(maxT, minT)
+];
+
+var vertexColors = [
+    vec4( 0.0, 0.0, 0.0, 1.0 ),  // black
+    vec4( 1.0, 0.0, 0.0, 1.0 ),  // red
+    vec4( 1.0, 1.0, 0.0, 1.0 ),  // yellow
+    vec4( 0.0, 1.0, 0.0, 1.0 ),  // green
+    vec4( 0.0, 0.0, 1.0, 1.0 ),  // blue
+    vec4( 1.0, 0.0, 1.0, 1.0 ),  // magenta
+    vec4( 0.0, 1.0, 1.0, 1.0 ),  // white
+    vec4( 0.0, 1.0, 1.0, 1.0 )   // cyan
+];
+
+var xAxis = 0;
+var yAxis = 1;
+var zAxis = 2;
+var axis = xAxis;
+var theta = [45.0, 45.0, 45.0];
+
+var thetaLoc;
+
+/**
+ * Main function that runs the program
+ */
+window.onload = async function init() {
+
+    canvas = document.getElementById( "gl-canvas" );
+    gl = WebGLUtils.setupWebGL( canvas );
+    canvas.style.border = "0.1px solid black";
+
+    if ( !gl ) { alert( "WebGL isn't available" ); }
+
+    gl.viewport( 0, 0, canvas.width, canvas.height );
+    gl.clearColor( 0.0, 0.0, 0.0, 1.0 );
+    gl.enable(gl.DEPTH_TEST);
+
+    //  Load shaders and initialize attribute buffers
+    program = initShaders( gl, "vertex-shader", "fragment-shader" );
+    gl.useProgram(program);
+
+
+    /*
+    scene_obj = new scene(gl, program, canvas,
+        null, null, projectionMatrix, projectionMatrixLoc,  null, null,
+        eye, at, up, fColor,
+        null, null, null,
+        null, null, null, null,
+        null, null, null, null,
+        null, null);
+
+     */
+
+
+    console.log("now starting object parsing!")
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /*******************
+     *
+     * parse mtls
+     *
+     * ****************/
+
+    /*
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //1) ex obj mtl
+
+    let ex_obj_mtl_text = await fetchText(ex_obj_mtl_URL);
+    exObj_mtl = new sceneObjectMTL(null, [], null);
+    parseMTLs(ex_obj_mtl_text, exObj_mtl);
+    exObj_mtl.mtlName = "exObj_mtl";
+    //console.log("exObj_mtl:", exObj_mtl);
+
+     */
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //1) car mtl
+
+    let car_mtl_text = await fetchText(car_mtl_URL);
+    car_mtl = new sceneObjectMTL(null, [], null);
+    parseMTLs(car_mtl_text, car_mtl);
+    car_mtl.mtlName = "car_mtl";
+    //console.log("car_mtl:", car_mtl);
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //2) lamp mtl
+
+    let lamp_mtl_text = await fetchText(lamp_mtl_URL);
+    lamp_mtl = new sceneObjectMTL(null, [], null);
+    parseMTLs(lamp_mtl_text, lamp_mtl);
+    lamp_mtl.mtlName = "lamp_mtl";
+    //console.log("lamp_mtl:", lamp_mtl);
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //stop sign mtl
+
+    let stopsign_mtl_text = await fetchText(stopsign_mtl_URL);
+    stopsign_mtl = new sceneObjectMTL(null, [], null);
+    parseMTLs(stopsign_mtl_text, stopsign_mtl);
+    stopsign_mtl.mtlName = "stopsign_mtl";
+    //console.log("stopsign_mtl:", stopsign_mtl);
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //street mtl
+
+    let street_mtl_text = await fetchText(street_mtl_URL);
+    street_mtl = new sceneObjectMTL(null, [], null);
+    parseMTLs(street_mtl_text, street_mtl);
+    street_mtl.mtlName = "street_mtl";
+    //console.log("street_mtl:", street_mtl);
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //street alt
+
+    let street_alt_mtl_text = await fetchText(street_alt_mtl_URL);
+    street_alt_mtl = new sceneObjectMTL(null, [], null);
+    parseMTLs(street_alt_mtl_text, street_alt_mtl);
+    street_alt_mtl.mtlName = "street_alt_mtl";
+    //console.log("street_alt_mtl:", street_alt_mtl);
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /*******************
+     *
+     * parse objects
+     *
+     * ****************/
+
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //1) ex obj
+
+        /*
+    let exObj_obj = await fetchText(ex_obj_URL);
+    exObj_obj = new sceneObject(null, [], [], [], [],
+        null, null, null);
+
+    //set the ex obj object position
+    exObj_obj.xPosition = 0;
+    exObj_obj.yPosition = 0;
+    exObj_obj.zPosition = -3;
+
+    //set the ex obj object rotation
+    exObj_obj.xRotation = 0;
+    exObj_obj.yRotation = 90;
+    exObj_obj.zRotation = 0;
+
+    parseObjects(exObj_obj, exObj_obj);
+    exObj_obj.objectName = "exObj_obj";
+    console.log("exObj_obj:", exObj_obj);
+
+         */
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //1) car
+
+    let car_text = await fetchText(car_obj_URL);
+    car_obj = new sceneObject(null, [], [], [], [],
+        null, null, null);
+
+    //set the car object position
+    car_obj.xPosition = 0;
+    car_obj.yPosition = 0;
+    car_obj.zPosition = -3;
+
+    //set the car object rotation
+    car_obj.xRotation = 0;
+    car_obj.yRotation = 90;
+    car_obj.zRotation = 0;
+
+    parseObjects(car_text, car_obj, car_mtl);
+    car_obj.objectName = "car_obj";
+    console.log("car_obj:", car_obj);
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //2) lamp
+
+    let lamp_text = await fetchText(lamp_obj_URL);
+    lamp_obj = new sceneObject(null, [], [], [], [],
+        null, null, null);
+    parseObjects(lamp_text, lamp_obj, lamp_mtl);
+    lamp_obj.objectName = "lamp_obj";
+    console.log("lamp_obj:", lamp_obj);
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //3) stop sign
+
+    let stopsign_text = await fetchText(stopsign_obj_URL);
+    stopsign_obj = new sceneObject(null, [], [], [], [],
+        null, null, null);
+
+    //set the stopsign object position
+    stopsign_obj.xPosition = 0;
+    stopsign_obj.yPosition = 0;
+    stopsign_obj.zPosition = -4.5;
+
+    //set the car object rotation
+    stopsign_obj.xRotation = 0;
+    stopsign_obj.yRotation = 0;
+    stopsign_obj.zRotation = 0;
+
+
+    parseObjects(stopsign_text, stopsign_obj, stopsign_mtl);
+    stopsign_obj.objectName = "stopsign_obj";
+    console.log("stopsign_obj:", stopsign_obj);
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //4) street
+
+    let street_text = await fetchText(street_obj_URL);
+    street_obj = new sceneObject(null, [], [], [], [],
+        null, null, null);
+    parseObjects(street_text, street_obj, street_mtl);
+    street_obj.objectName = "street_obj";
+    console.log("street_obj:", street_obj);
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //5) street alt
+
+    let street_alt_text = await fetchText(street_alt_obj_URL);
+    street_alt_obj = new sceneObject(null, [], [], [], [],
+        null, null, null);
+    parseObjects(street_alt_text, street_alt_obj, street_alt_mtl);
+    street_alt_obj.objectName = "street_alt_obj";
+    console.log("street_alt_obj:", street_alt_obj);
+
+
+
+
+
+    /*******************
+     *
+     * link data to one another
+     *
+     *
+     * ****************/
+
+    /**link objects & mtls**/
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //link car object & car mtl object
+    /*
+    exObj_obj.correspondingMTL = exObj_mtl;
+    exObj_mtl.correspondingObject = exObj_obj;
+
+     */
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //link car object & car mtl object
+    car_obj.correspondingMTL = car_mtl;
+    car_mtl.correspondingObject = car_obj;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //link lamp object & lamp mtl
+    lamp_obj.correspondingMTL = lamp_mtl;
+    lamp_obj.correspondingObject = lamp_obj;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //link stop sign object & stop sign mtl object
+    stopsign_obj.correspondingMTL = stopsign_mtl;
+    stopsign_mtl.correspondingObject = stopsign_obj;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //link street object & street mtl object
+    street_obj.correspondingMTL = street_mtl;
+    street_mtl.correspondingObject = street_obj;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //link street alt object & street alt mtl object
+    street_alt_obj.correspondingMTL = street_alt_mtl;
+    street_alt_mtl.correspondingObject = street_alt_obj;
+
+
+    /**parse pngs**/
+    //stop_png = parsePNGs(stop_png_URL);
+    //stop_alt_png = parsePNGs(stop_alt_png_URL);
+
+    /**make object array**/
+    obj_array.push(car_obj);
+    obj_array.push(lamp_obj);
+    obj_array.push(stopsign_obj);
+    obj_array.push(street_obj);
+    obj_array.push(street_alt_obj);
+
+    /**make mtl array**/
+    mtl_array.push(car_mtl);
+    mtl_array.push(lamp_mtl);
+    mtl_array.push(stopsign_mtl);
+    mtl_array.push(street_mtl);
+    mtl_array.push(street_alt_mtl);
+
+
+    //handle the drawing the objects onto the screen component
+    handleDrawing();
+
+    //setInterval(handleDrawing, 1000); //--> call handle drawing once every second
+    //this is doing whole animation once every second
+
+}
+
+function handleDrawing(){
+
+    //car_obj.xPosition += 0.1;   //no know getting x, y, z positions out of every car object
+
+    /**
+     * starter code
+     */
+
+    //camera & lighting
+    light = vec3(1.5, 0.0, 2.0);
+    at = vec3(0.0, 0.0, 0.0);
+    up = vec3(0.0, 1.0, 0.0);
+    eye = vec3(3.5, 0.0, 0.0);
+
+
+    // colors red, black, blue, yellow, green
+    red = vec4(1.0, 0.0, 0.0, 1.0);
+    black = vec4(0.0, 0.0, 0.0, 1.0);
+    blue = vec4(0.0, 0.0, 1.0, 1.0);
+    yellow = vec4(1.0, 1.0, 0.0, 1.0);
+    green = vec4(0.0, 1.0, 0.0, 1.0);
+
+    m = mat4();
+
+    let vBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, vBuffer );
+    //gl.bufferData( gl.ARRAY_BUFFER, flatten(pointsArray), gl.STATIC_DRAW );
+
+
+    setCameraAndProjection();
+
+    //create a temp array of colors to print the objects as
+    let color = [];
+    color.push(red);
+    color.push(black);
+    color.push(yellow);
+    color.push(blue);
+    color.push(green);
+    color.push(red);
+    color.push(black);
+    color.push(yellow);
+    color.push(blue);
+    color.push(green);
+
+    gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    //go through all the objects
+    for(let i= 0; i <obj_array.length; i++){
+
+        console.log("--------------generalObject Name:", obj_array[i].objectName);
+        //console.log("generalObject:", obj_array[i]);
+        //console.log("----------------------------------------------------");
+
+        //per object, store the materials data to be sent to render
+
+        //per objects, go through all the components (objects per material object)
+        //push the diffuse colors
+        let r = obj_array[i].correspondingMTL.mtls[0].diffuseColors[0][0];
+        let b = obj_array[i].correspondingMTL.mtls[0].diffuseColors[0][1];
+        let g = obj_array[i].correspondingMTL.mtls[0].diffuseColors[0][2];
+
+        for(let k=0; k<obj_array[i].correspondingMTL.mtls.length; k++){
+            let r = obj_array[i].correspondingMTL.mtls[k].diffuseColors[0][0];
+            let b = obj_array[i].correspondingMTL.mtls[k].diffuseColors[0][1];
+            let g = obj_array[i].correspondingMTL.mtls[k].diffuseColors[0][2];
+            let newColor = new vec4(r, b, g);
+            newColor[3] = 1.0;
+            //console.log("newColor", newColor);
+            colorsArray.push(newColor);
+        }
+
+        //console.log("diffuse colors", colorsArray);
+
+        //draw specific object
+        for(let j=0; j<obj_array[i].materials.length; j++){
+
+            //console.log("inside");
+
+            //console.log("vertices points");
+            let verticesPointsArray = obj_array[i].materials[j].verticesPointsArray;
+            //console.log("verticesPointsArray:", verticesPointsArray);
+            let convertedVertices = convertVerticesData(verticesPointsArray);
+            //console.log("convertedVertices:", convertedVertices);
+
+
+            //console.log("texture coords");
+            let texturePointsArray = obj_array[i].materials[j].textureCoordsArray;
+            //console.log("texturePointsArray:", texturePointsArray);
+            let convertedTextPointsArray = convertVerticesData(texturePointsArray);
+            //console.log("convertedTextPointsArray:", convertedTextPointsArray);
+
+            //console.log("normals");
+            let vertexNormalsArray = obj_array[i].materials[j].vertexNormalsArray;
+            //console.log("vertexNormalsArray:", vertexNormalsArray);
+            let convertedNormalsPointsArray = convertVerticesData(vertexNormalsArray);
+            //console.log("convertedNormalsPointsArray:", convertedNormalsPointsArray);
+
+
+            //if texture coords are null, don't want to make an array of empty arrays
+            if(obj_array[i].textureCoordinates.length == 0){ //if texture coordinates are null
+                convertedTextPointsArray = null;
+            }
+
+            let colorData = matchMaterialInfo(obj_array[i].materials[j].useMaterial, obj_array[i]);
+
+            handleLighting();
+
+            let currDiffuse = colorData.diffuseColors;
+            let rDiffuse = currDiffuse[0][0];
+            let bDiffuse = currDiffuse[0][1];
+            let gDiffuse = currDiffuse[0][2];
+            let renderColor = new vec4(rDiffuse,bDiffuse, gDiffuse);
+            renderColor[3] = 1.0;
+            //console.log("renderColor:", renderColor);
+
+            //render(convertedVertices, convertedTextPointsArray, obj_array[i].objectName, color[i], obj_array[i]);
+            render(convertedVertices, convertedTextPointsArray, convertedNormalsPointsArray, obj_array[i].objectName, renderColor, obj_array[i]);
+
+        }
+
+        //clear colors array for next object's materials
+        colorsArray = [];
+
+
+    }
+
+}
+
+
+/**
+ * Sets the material data to be sent to the frag shader per material being rendered
+ * @param currentMaterial
+ * @param object
+ */
+function matchMaterialInfo(currentMaterial, object){
+
+    //goes through the materials and sets back the lighting and specular info
+    //console.log("match material info");
+
+    //console.log("currentMaterial", currentMaterial);
+
+    for(let k=0; k<object.correspondingMTL.mtls.length; k++){
+
+        //if they match, set the info
+        if(currentMaterial == object.correspondingMTL.mtls[k].newMTL){
+
+            //set material diffuse
+            let r = object.correspondingMTL.mtls[k].diffuseColors[0][0];
+            let b = object.correspondingMTL.mtls[k].diffuseColors[0][1];
+            let g = object.correspondingMTL.mtls[k].diffuseColors[0][2];
+            materialDiffuse = new vec4(r, b, g);
+            materialDiffuse[3] = 1.0;
+            //console.log("materialDiffuse", materialDiffuse);
+
+            //set material specular
+            let r2 = object.correspondingMTL.mtls[k].specularColors[0][0];
+            let b2 = object.correspondingMTL.mtls[k].specularColors[0][1];
+            let g2 = object.correspondingMTL.mtls[k].specularColors[0][2];
+            materialSpecular = new vec4(r2, b2, g2);
+            materialSpecular[3] = 1.0;
+            //console.log("materialSpecular", materialSpecular);
+
+            //set material ambient
+            let smallFraction = 1/1000;
+            let r3 = object.correspondingMTL.mtls[k].diffuseColors[0][0] * smallFraction;
+            let b3 = object.correspondingMTL.mtls[k].diffuseColors[0][1] * smallFraction;
+            let g3 = object.correspondingMTL.mtls[k].diffuseColors[0][2] * smallFraction;
+
+            materialAmbient = new vec4(r3, b3, g3);
+            materialAmbient[3] = 1.0;
+            //console.log("materialAmbient", materialAmbient);
+
+            return object.correspondingMTL.mtls[k];
+
+        }
+    }
+}
+
+/**
+ * Function that takes care of the static projections:
+ * camera matrix & projection matrix
+ */
+function setCameraAndProjection(){
+
+    //eye = vec3(0, 0, 20);                      //z value, looking down at z axis
+    eye = vec3(4.5, 1.0, -5.0);     //where the camera is in the world, pos of eye in 3d space
+    light = vec3(1.5, 0.0, 2.0);
+    at = vec3(0.0, 0.0, 0.0);       //where the camera is looking at
+    up = vec3(0.0, 1.0, 0.0);       //the direction of the up vector, unit vector pointing upwards
+    aspect = canvas.width/canvas.height;
+
+    //handle projection matrix
+    projectionMatrix = perspective(60, aspect, near, far);
+    projectionMatrixLoc = gl.getUniformLocation( program, "projectionMatrix" );
+    gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix) );
+
+    //handle camera matrix
+    cameraMatrix = lookAt(eye, at, up);
+    cameraMatrixLoc = gl.getUniformLocation(program, "cameraMatrix");
+    gl.uniformMatrix4fv(cameraMatrixLoc, false, flatten(cameraMatrix));
+}
+
+/**
+ * Handles the lighting elements in the canvas
+ */
+function handleLighting(){
+
+    //ambientLighting
+
+    //Diffuse colors in the form “Kd [R] [G] [B]”
+    //Specular colors in the form “Ks [R] [G] [B]”
+    //A diffuse texture map in the form “map_Kd [Map Image]”
+
+    var diffuseProduct = mult(lightDiffuse, materialDiffuse);
+    var specularProduct = mult(lightSpecular, materialSpecular);
+    var ambientProduct = mult(lightAmbient, materialAmbient);
+
+    gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"), flatten(diffuseProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"), flatten(specularProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"), flatten(ambientProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+    gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
+}
+
+
+function render(convertedVertices, convertedTextPoints, convertedNormalsPointsArray, objectName, color, object){
+
+    //set model view matrix
+    modelViewMatrix = lookAt(eye, at, up);
+
+
+    //color buffer
+    /*
+    var cBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, cBuffer );
+    //gl.bufferData( gl.ARRAY_BUFFER, flatten(colorsArray), gl.STATIC_DRAW );
+    gl.bufferData( gl.ARRAY_BUFFER, flatten(colorsArray), gl.STATIC_DRAW );
+
+    var vColor = gl.getAttribLocation( program, "vColor" );
+    gl.vertexAttribPointer( vColor, 4, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vColor );
+     */
+
+    //model view matrix to handle position points
+    //rotation + scale before translation
+    let rotationMatrix = rotateObjectPoints(object.xRotation, object.yRotation, object.zRotation);     //rotate, scale, translate
+    let scaleMatrix = scaleObjectPoints(object.xScale, object.yScale, object.zScale);     //rotate, scale, translate
+    let translationMatrix = translateObjectPoints(object.xPosition, object.yPosition, object.zPosition);     //rotate, scale, translate
+
+    //NOTE: If strange rotations are happening then swap and fix the order of rotations are being applied
+    //conventional is rotate, scale, translate
+    //but now currently the working version is translate, rotate, scale
+    modelViewMatrix = mult(mat4(), translationMatrix);
+    modelViewMatrix = mult(modelViewMatrix, scaleMatrix);
+    modelViewMatrix = mult(modelViewMatrix, rotationMatrix);
+    //modelViewMatrix = mult(mat4(), translationMatrix);
+
+    modelViewMatrixLoc = gl.getUniformLocation( program, "modelViewMatrix" );
+    gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
+    fColor = gl.getUniformLocation(program, "fColor");
+
+    //gl.uniform4fv(fColor, flatten(red));
+
+    //if we have a text map of some sort
+    if(convertedTextPoints != null){
+
+        /*
+        var tBuffer = gl.createBuffer();
+        gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer );
+        //gl.bufferData( gl.ARRAY_BUFFER, flatten(texCoordsArray), gl.STATIC_DRAW );
+        gl.bufferData( gl.ARRAY_BUFFER, flatten(convertedTextPoints), gl.STATIC_DRAW );
+
+        var vTexCoord = gl.getAttribLocation( program, "vTexCoord" );
+        gl.vertexAttribPointer( vTexCoord, 2, gl.FLOAT, false, 0, 0 );
+        gl.enableVertexAttribArray( vTexCoord );
+
+        //create stop sign alt texture
+        var image0 = new Image();
+        image0.crossOrigin = "";
+        image0.src = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/stop_alt.png";
+        image0.onload = function() {
+            configureTexture0(image0);
+        }
+
+        //create stop sign texture
+        var image1 = new Image();
+        image1.crossOrigin = "";
+        image1.src = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/stop.png";
+        image1.onload = function() {
+            configureTexture1(image1);
+        }
+
+        thetaLoc = gl.getUniformLocation(program, "theta");
+
+        createATexture();
+         */
+
+    }
+
+
+    //////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////
+
+    //projectionMatrixLoc = gl.getUniformLocation( program, "projectionMatrix" );
+    //projectionMatrix = perspective(120, aspect, near, far);
+    //gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
+
+    for(k=0; k<convertedVertices.length; k++){
+
+        //console.log("------------OBJECT NAME:", objectName);
+
+        //send in data for vPosiiton
+        gl.uniform4fv(fColor, flatten(color));
+        let vPosition = gl.getAttribLocation( program, "vPosition" );
+        gl.vertexAttribPointer( vPosition, 3, gl.FLOAT, false, 0, 0 );
+        gl.enableVertexAttribArray( vPosition );
+        aspect = canvas.width/canvas.height;
+
+        //console.log("convertedVertices[k]:", convertedVertices[k]);
+        flattenedArray = flatten(convertedVertices[k]);
+        //console.log("flattenedArray:", flattenedArray);
+        gl.bufferData( gl.ARRAY_BUFFER, flattenedArray, gl.STATIC_DRAW);
+
+        var nBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flattenedNormalArray, gl.STATIC_DRAW);
+
+
+        let vNormal = gl.getAttribLocation( program, "vNormal" );
+        gl.vertexAttribPointer( vNormal, 3, gl.FLOAT, false, 0, 0 );
+        gl.enableVertexAttribArray( vNormal );
+
+
+        //send in data for vNormal
+        /*flattenedNormalArray = flatten(convertedNormalsPointsArray[k]);
+        console.log("FLATTENED normal array[k]", flattenedNormalArray);
+        let vNormal = gl.getAttribLocation( program, "vNormal" );
+        gl.vertexAttribPointer( vNormal, 3, gl.FLOAT, false, 0, 0 );
+        gl.enableVertexAttribArray( vNormal );
+
+         */
+        //gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flattenedNormalArray), gl.STATIC_DRAW);
+        //gl.bufferData(gl.ARRAY_BUFFER, flattenedNormalArray, gl.STATIC_DRAW);
+        //gl.bufferData(gl.ArrayBuffer, [0, 1, 0, 1] , gl.STATIC_DRAW);
+
+        //draw to screen
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, flattenedArray.length/3);
+        //firstDraw = false;
+    }
+}
+
+
+/**
+ * function that takes takes given points and returns a rotated matrix
+ */
+function scaleObjectPoints(x, y, z){
+    var scaleMatrix1 = scalem(x, y, z);
+    return scaleMatrix1;
+}
+
+
+/**
+ * function that takes takes given points and returns a rotated matrix
+ */
+function rotateObjectPoints(x, y, z){
+    var rotateMatrixX = rotateX(x);
+    var rotateMatrixY = rotateY(y);
+    var rotateMatrixZ = rotateZ(z);
+    var rotateMatrix1 = mult(rotateMatrixX, rotateMatrixY);
+    var rotateMatrix = mult(rotateMatrix1, rotateMatrixZ);
+
+    return rotateMatrix;
+}
+
+
+/**
+ * Translate the object points to point (-8,8)
+ * @returns translateMatrix1 the translation matrix given the translation points
+ */
+function translateObjectPoints(x, y, z){
+    var translateMatrix1 = translate(x, y, z);
+    return translateMatrix1;
+}
+
+/**
+ *
+ * @param verticesPointsArray
+ * @returns {*[]}
+ */
+function convertVerticesData(verticesPointsArray){
+
+    let tempFaceArrayData = [];
+    let faceArrayData = [];
+
+
+    //take the array of arrays --> turn 3d array into 2d array
+    //for all the faces
+    for (let w = 0; w < verticesPointsArray.length; w++) {
+        //for each face
+        //console.log("***ty:");
+        //console.log("verticesPointsArray[w]", verticesPointsArray[w]);
+        for (let k = 0; k < verticesPointsArray[w].length; k++) {
+            //for each points in the face
+            //console.log("verticesPointsArray[w]", verticesPointsArray[w]);
+            //console.log("***y:");
+            for (let s = 0; s < verticesPointsArray[w][k].length; s++) {
+                //console.log("***tempFaceArrayData:");
+                tempFaceArrayData.push(verticesPointsArray[w][k][s]);
+                //console.log("***tempFaceArrayData:", verticesPointsArray[w][k][s]);
+            }
+        }
+        faceArrayData.push(tempFaceArrayData);
+        tempFaceArrayData = [];
+    }
+
+    //console.log("faceArrayData:", faceArrayData);
+    return faceArrayData;
+
+}
+
+
+/**
+ * Function that renders the scene
+ */
+/*let render = function() {
+
+    //gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+
+    //gl.drawArrays(gl.TRIANGLE_FAN, 0, stopsign_obj.materials[0].verticesPointsArray.length);
+
+    //gl.drawArrays(gl.TRIANGLE_FAN, 0, stopsign_obj.positionVertices.length);
+    //gl.drawArrays(gl.TRIANGLE_FAN, 0, stopsign_obj.materials[0].verticesPointsArray.length);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, flattenedArray.length/3);
+
+}
+
+ */
+
+
+function configureCubeMap() {
+    cubeMap = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMap);
+
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, red);
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, yellow);
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, green);
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, cyan);
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, blue);
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, magenta);
+
+    gl.uniform1i(gl.getUniformLocation(program, "texMap"), 0);
+}
+
+
+function createATexture() {
+    var tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+        new Uint8Array([0, 0, 255, 255, 255, 0, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255]));
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+}
+
+
+//create stop sign alt texture
+function configureTexture0(image) {
+    var tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    gl.uniform1i(gl.getUniformLocation(program, "tex0"), 0);
+
+}
+
+//create stop sign texture
+function configureTexture1(image) {
+    var tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    gl.uniform1i(gl.getUniformLocation(program, "tex1"), 1);
+
+}
+
+
+
+
+/////////////////////////////////////////
+RENDER
+/**
+ * Renders a single object given the object data
+ * @param vertices
+ * @param textureCoordinates
+ * @param normals
+ * @param diffuseColors
+ * @param specularColors
+ * @param objectName
+ * @param object
+ */
+function render(objectName, object){
+
+    //set model view matrix
+    modelViewMatrix = lookAt(eye, at, up);
+
+    let vertices = object.triangulated_positionVertices;
+    console.log("vertices:", flatten(vertices));
+    console.log("vertices:", vertices);
+    console.log("vertices.length:", vertices.length);
+
+    let textureCoordinates = object.triangulated_textureCoordinates;
+    console.log("textureCoordinates:", flatten(textureCoordinates));
+
+    let normals = object.triangulated_vertexNormals;
+    console.log("normals:", flatten(normals));
+
+    let diffuseColors = object.triangulated_diffuseColors;
+    console.log("diffuseColors:", flatten(diffuseColors));
+
+    let specularColors = object.triangulated_specularColors;
+    console.log("specularColors:", flatten(specularColors));
+
+
+    //model view matrix to handle position points
+    //rotation + scale before translation
+    let rotationMatrix = rotateObjectPoints(object.xRotation, object.yRotation, object.zRotation);     //rotate, scale, translate
+    let scaleMatrix = scaleObjectPoints(object.xScale, object.yScale, object.zScale);     //rotate, scale, translate
+    let translationMatrix = translateObjectPoints(object.xPosition, object.yPosition, object.zPosition);     //rotate, scale, translate
+
+    //NOTE: If strange rotations are happening then swap and fix the order of rotations are being applied
+    //conventional is rotate, scale, translate
+    //but now currently the working version is translate, rotate, scale
+    modelViewMatrix = mult(mat4(), translationMatrix);
+    modelViewMatrix = mult(modelViewMatrix, scaleMatrix);
+    modelViewMatrix = mult(modelViewMatrix, rotationMatrix);
+    //modelViewMatrix = mult(mat4(), translationMatrix);
+
+    modelViewMatrixLoc = gl.getUniformLocation( program, "modelViewMatrix" );
+    gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
+    //fColor = gl.getUniformLocation(program, "fColor");
+
+    //gl.uniform4fv(fColor, flatten(red));
+
+    //if we have a text map of some sort
+        /*
+        var tBuffer = gl.createBuffer();
+        gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer );
+        //gl.bufferData( gl.ARRAY_BUFFER, flatten(texCoordsArray), gl.STATIC_DRAW );
+        gl.bufferData( gl.ARRAY_BUFFER, flatten(convertedTextPoints), gl.STATIC_DRAW );
+
+        var vTexCoord = gl.getAttribLocation( program, "vTexCoord" );
+        gl.vertexAttribPointer( vTexCoord, 2, gl.FLOAT, false, 0, 0 );
+        gl.enableVertexAttribArray( vTexCoord );
+
+        //create stop sign alt texture
+        var image0 = new Image();
+        image0.crossOrigin = "";
+        image0.src = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/stop_alt.png";
+        image0.onload = function() {
+            configureTexture0(image0);
+        }
+
+        //create stop sign texture
+        var image1 = new Image();
+        image1.crossOrigin = "";
+        image1.src = "https://web.cs.wpi.edu/~jmcuneo/cs4731/project3_1/stop.png";
+        image1.onload = function() {
+            configureTexture1(image1);
+        }
+
+        thetaLoc = gl.getUniformLocation(program, "theta");
+
+        createATexture();
+         */
+
+    //////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * position vertices data - buffer
+     */
+
+    let vBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, vBuffer );
+    //gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
+    gl.bufferData( gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW );
+
+    //gl.uniform4fv(fColor, diffuseColors);
+    let vPosition = gl.getAttribLocation( program, "vPosition" );
+    gl.vertexAttribPointer( vPosition, 3, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vPosition );
+
+
+
+    /**
+     * texture coordinates - buffer
+     */
+
+    /*var tBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
+    //gl.bufferData(gl.ARRAY_BUFFER, flatten(textureCoordinates), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, textureCoordinates, gl.STATIC_DRAW);
+
+    let vTexture = gl.getAttribLocation( program, "vTexture" );
+    gl.vertexAttribPointer( vTexture, 3, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vTexture );
+
+     */
+
+
+    /**
+     * normals - buffer
+     */
+
+    /*var nBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
+    //gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
+
+    let vNormal = gl.getAttribLocation( program, "vNormal" );
+    gl.vertexAttribPointer( vNormal, 3, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vNormal );
+
+     */
+
+
+    //send in data for vNormal
+    /*flattenedNormalArray = flatten(convertedNormalsPointsArray[k]);
+    console.log("FLATTENED normal array[k]", flattenedNormalArray);
+    let vNormal = gl.getAttribLocation( program, "vNormal" );
+    gl.vertexAttribPointer( vNormal, 3, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vNormal );
+     */
+
+
+    /**
+     * diffuse colors - buffer
+     */
+
+   /*var diffuseCBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, diffuseCBuffer );
+    //gl.bufferData( gl.ARRAY_BUFFER, flatten(diffuseColors), gl.STATIC_DRAW );
+    gl.bufferData( gl.ARRAY_BUFFER, flatten(colorsArray), gl.STATIC_DRAW );
+
+
+    var vColor = gl.getAttribLocation( program, "vColor" );
+    gl.vertexAttribPointer( vColor, 4, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vColor );
+    */
+
+
+    /**
+     * specular colors - buffer
+     */
+
+    /*
+    var specularCBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, specularCBuffer );
+    //gl.bufferData( gl.ARRAY_BUFFER, flatten(colorsArray), gl.STATIC_DRAW );
+    gl.bufferData( gl.ARRAY_BUFFER, specularColors, gl.STATIC_DRAW );
+
+    var vColor = gl.getAttribLocation( program, "vColor" );
+    gl.vertexAttribPointer( vColor, 4, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vColor );
+     */
+
+    //gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flattenedNormalArray), gl.STATIC_DRAW);
+    //gl.bufferData(gl.ARRAY_BUFFER, flattenedNormalArray, gl.STATIC_DRAW);
+    //gl.bufferData(gl.ArrayBuffer, [0, 1, 0, 1] , gl.STATIC_DRAW);
+
+    //draw to screen
+    gl.drawArrays(gl.TRIANGLES, 0,vertices.length/3);
+
+
+}

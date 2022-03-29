@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>CS 543 Project 3</title>
+
+    <!--Vertex Shader-------------------------------------------------->
+    <script id="vertex-shader" type="x-shader/x-vertex">
+
+    ///////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////// original/////////////////////////////////////
+
+    precision mediump float;
+    attribute vec4 vPosition;
+    attribute vec4 vTexture;
+    attribute vec4 vNormal;
+    attribute vec4 vColor;
+    attribute vec4 vColorDiffuse;
+    attribute vec4 vColorSpecular;
+
+    uniform mat4 projectionMatrix;
+    uniform mat4 cameraMatrix;
+    uniform mat4 modelViewMatrix;
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    varying vec3 L, N, V;
+    varying vec4 fColor;
+
+    uniform vec4 lightPosition;
+    uniform vec4 ambientProduct, diffuseProduct, specularProduct;
+    uniform float shininess;
+
+    void main()
+    {
+
+        /*vec4 diffuseProduct = mult(lightDiffuse, materialDiffuse);
+        vec4 specularProduct = mult(lightSpecular, materialSpecular);
+        vec4 ambientProduct = mult(lightAmbient, materialAmbient);
+        */
+
+        vec3 pos = (cameraMatrix * vPosition).xyz;       //vec3 pos = (modelViewMatrix * vPosition).xyz;
+        //L = normalize(lightPosition.xyz - pos);          //Local Lighting,
+        //N = normalize(cameraMatrix * vNormal).xyz;       //N = normalize(modelViewMatrix * vNormal).xyz; orig
+        //N = normalize(modelViewMatrix * vNormal).xyz;       //N = normalize(modelViewMatrix * vNormal).xyz;
+                                                            //mult normals by modelView matrix to correct rotations/trans
+
+        V = normalize(-pos);
+
+        //N = vec3(1.0, 0.0, 0.0);
+        //N = -1.0 * vNormal.xyz;    //--> swizzle, interpreting anything after dot is member of struct
+        //N = vNormal.xyz;    //--> swizzle, interpreting anything after dot is member of struct
+
+
+        //create world offset --> transform --> modelViewMatrix, mult the vector, as a point in space, multiplied by MVmatrix
+        vec4 worldOffset = modelViewMatrix * vec4(0, 0, 0, 1);
+        vec4 unNormalizedNormal = modelViewMatrix * vNormal;
+        N = normalize(unNormalizedNormal.xyz / unNormalizedNormal.w) - (worldOffset.xyz/ worldOffset.w) ;
+        fColor = vColor;
+
+        ///////////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////// original/////////////////////////////////////
+
+        gl_Position = projectionMatrix * cameraMatrix * modelViewMatrix * vPosition;
+
+
+        ///////////////////////////////////////////////////////////////////////////////
+
+
+
+    }
+    </script>
+
+    <!--Fragment Shader-------------------------------------------------->
+    <script id="fragment-shader" type="x-shader/x-fragment">
+
+    precision mediump float;
+    uniform vec4 fColor;
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    precision mediump float;
+    varying vec3 L, N, V;
+    uniform vec4 ambientProduct, diffuseProduct, specularProduct;
+    uniform float shininess;
+    //varying vec4 fColor;
+
+    void main()
+    {
+
+
+        /*
+        vec3 R = (2.0 * dot(L, N) * N) - L;                //angle of reflection, angle of incidence
+        vec4 diffuse = diffuseProduct * dot(L, N);
+        vec4 ambient = ambientProduct;
+        vec4 specular = specularProduct * pow(max(dot(V, R), 0.0), shininess);
+        vec4 fColor = diffuse + specular + ambient;
+        fColor.a = 1.0;
+        gl_FragColor = fColor;
+        */
+
+        //gl_FragColor = vec4(N, 1.0);
+        //fake lighting to how program is interpreting normals
+        //gl_FragColor = vec4(vec3(dot(N, vec3(0.0, -1.0, -1.0))), 1.0);
+
+
+        ///////////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////// original/////////////////////////////////////
+        gl_FragColor = fColor;
+
+        /////////////////////////////////////////////////////////////////////////////
+
+
+    }
+    </script>
+
+    <!--Included Scripts--------------------------------------------------------------->
+    <script type="text/javascript" src="lib/webgl-utils.js"></script>
+    <script type="text/javascript" src="lib/initShaders.js"></script>
+    <script type="text/javascript" src="lib/MV.js"></script>
+    <script type="text/javascript" src="main.js"></script>
+    <script type="text/javascript" src="scene.js"></script>
+    <script type="text/javascript" src="sceneObject.js"></script>
+    <script type="text/javascript" src="sceneObjectMTL.js"></script>
+    <script type="text/javascript" src="parseObjects.js"></script>
+    <script type="text/javascript" src="mtl.js"></script>
+    <script type="text/javascript" src="parseMTLs.js"></script>
+    <script type="text/javascript" src="utility.js"></script>
+
+</head>
+<!--body--------------------------------------------------------------------->
+<body>
+<!--title------------------------------------------------------------------>
+<h1>CS 543 Project 3</h1>
+<canvas id="gl-canvas" width="900" height="600">
+    Oops ... your browser doesn't support the HTML5 canvas element
+</canvas>
+
+</body>
+</html>
